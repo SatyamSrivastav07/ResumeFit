@@ -1,0 +1,46 @@
+@page {
+  size: A4;
+  margin: 13mm 14mm;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: #151515;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.35;
+}
+
+a { color: #151515; text-decoration: underline; }
+h1, h2, h3, p { margin: 0; }
+
+.header { margin-bottom: 4mm; text-align: center; }
+.name { font-size: 20pt; font-weight: 700; letter-spacing: .2pt; text-transform: uppercase; }
+.contact, .links { margin-top: 1.2mm; overflow-wrap: anywhere; }
+.separator { padding: 0 1.5mm; }
+
+.section { margin-top: 3.5mm; }
+.section-title {
+  border-bottom: .35mm solid #222;
+  font-size: 11.5pt;
+  font-weight: 700;
+  letter-spacing: .4pt;
+  margin-bottom: 1.8mm;
+  padding-bottom: .6mm;
+  text-transform: uppercase;
+  break-after: avoid;
+}
+
+.item { margin-bottom: 2.3mm; break-inside: avoid; }
+.item:last-child { margin-bottom: 0; }
+.item-heading { display: flex; justify-content: space-between; gap: 4mm; font-size: 10pt; font-weight: 700; }
+.item-heading .dates { flex-shrink: 0; font-weight: 400; }
+.item-subheading { display: flex; justify-content: space-between; gap: 4mm; margin-top: .4mm; }
+.muted { color: #333; }
+.skills-row + .skills-row { margin-top: .7mm; }
+.label { font-weight: 700; }
+ul { margin: 1mm 0 0 4.5mm; padding-left: 3mm; }
+li { margin: 0 0 .6mm; padding-left: .5mm; }
+.summary { white-space: pre-line; }
