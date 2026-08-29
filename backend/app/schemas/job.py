@@ -60,12 +60,12 @@ class JobAnalysisRequest(JobModel):
 
 
 class JobAnalysisSchema(JobModel):
-    company: str
-    role: str
+    company: str = Field(max_length=150)
+    role: str = Field(max_length=150)
     experience_level: ExperienceLevel = "Unspecified"
     employment_type: EmploymentType = "Unspecified"
-    required_skills: list[str] = Field(default_factory=list)
-    preferred_skills: list[str] = Field(default_factory=list)
+    required_skills: list[str] = Field(default_factory=list, max_length=200)
+    preferred_skills: list[str] = Field(default_factory=list, max_length=200)
     programming_languages: list[str] = Field(default_factory=list)
     frameworks: list[str] = Field(default_factory=list)
     databases: list[str] = Field(default_factory=list)
@@ -100,4 +100,14 @@ class JobDetailResponse(JobModel):
 
 
 class JobListResponse(JobModel):
-    items: list[JobDetailResponse]
+    items: list["JobListItem"]
+
+
+class JobListItem(JobModel):
+    job_id: str
+    resume_id: str
+    company: str
+    role: str
+    status: Literal["analyzed", "matched", "optimization_started", "completed"]
+    created_at: datetime
+    updated_at: datetime

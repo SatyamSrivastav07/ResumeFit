@@ -158,7 +158,8 @@ def test_evidenced_skill_addition_is_applied_only_after_approval() -> None:
     validate_suggestion(resume, proposed)
     applied = apply_approved_suggestions(resume, job_fixture(), [proposed])
 
-    assert "Docker" in applied.optimized_resume.skills.technical
+    assert "Docker" in applied.optimized_resume.skills.tools
+    assert "Docker" not in applied.optimized_resume.skills.technical
     assert "Docker" not in resume.skills.technical
 
 

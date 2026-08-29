@@ -140,9 +140,8 @@ def test_mistral_failure_returns_safe_error(
     response = client.post("/api/jobs/analyze", json=valid_payload())
 
     assert response.status_code == 502
-    assert response.json() == {
-        "detail": "Unable to analyze this job right now. Please try again."
-    }
+    assert response.json()["detail"] == "Unable to analyze this job right now. Please try again."
+    assert response.json()["error"]["code"] == "UPSTREAM_ERROR"
     assert "private provider failure details" not in response.text
 
 

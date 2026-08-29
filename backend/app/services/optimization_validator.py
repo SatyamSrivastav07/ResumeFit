@@ -252,6 +252,10 @@ def apply_approved_suggestions(
         elif suggestion.type in {"add_tool_skill", "confirm_tool_skill"}:
             optimized.skills.tools.append(suggestion.suggested)
 
+    # Revalidate after list mutation so additions are deduplicated and obvious
+    # technologies/tools land in the correct ATS section.
+    optimized = ResumeSchema.model_validate(optimized.model_dump())
+
     return AppliedOptimization(
         optimized_resume=optimized,
         before_match=calculate_resume_match(resume, job),

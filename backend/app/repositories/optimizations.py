@@ -57,6 +57,13 @@ async def list_for_job(database: Any, user_id: str, job_id: str) -> list[dict[st
     return [document async for document in cursor]
 
 
+async def get_active_for_job(database: Any, user_id: str, job_id: str) -> dict[str, Any] | None:
+    return await database.optimizations.find_one(
+        {"user_id": user_id, "job_id": job_id, "status": "suggestions_generated"},
+        sort=[("created_at", -1), ("optimization_id", -1)],
+    )
+
+
 async def delete_optimization_record(database: Any, user_id: str, optimization_id: str) -> bool:
     result = await database.optimizations.delete_one({"user_id": user_id, "optimization_id": optimization_id})
     return bool(result.deleted_count)

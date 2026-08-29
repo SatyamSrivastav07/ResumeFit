@@ -522,4 +522,121 @@ npm run lint
 
 ## Environment configuration
 
-Copy each `.env.example` file to `.env`. Never commit the resulting `.env` files or real credentials. Phase 4 reads Firebase, AWS, Mistral, and frontend/API URL values. MongoDB remains reserved for a later phase.
+Copy each `.env.example` file to `.env`. Never commit the resulting `.env` files or real credentials. The backend reads Firebase, AWS, Mistral, MongoDB, limits, and runtime policy; the frontend receives only its public Firebase web configuration and API URL.
+
+## Production readiness and deployment (Phase 10)
+
+### Environment separation
+
+Set `APP_ENV` explicitly to `development`, `test`, or `production`. Production
+startup fails before serving traffic when MongoDB, Mistral, AWS S3, Firebase
+Admin credentials, or an HTTPS frontend origin is missing. Copy
+`backend/.env.example` and `frontend/.env.example`; never copy backend secrets
+into Vite variables. API docs are controlled by `ENABLE_API_DOCS` and should
+normally be disabled in production.
+
+The browser uses `VITE_API_BASE_URL` as its only API origin. Production builds
+fail when it is absent. Both frontend and backend must be exposed exclusively
+through HTTPS in production; TLS may terminate at a trusted hosting platform or
+load balancer.
+
+### Production start and Docker
+
+Run without reload:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-access-log
+```
+
+Or build the non-root container:
+
+```bash
+docker build -t resumefit-api ./backend
+docker run --rm -p 8000:8000 --env-file ./backend/.env \
+  -v /absolute/secure/firebase-service-account.json:/run/secrets/firebase.json:ro \
+  resumefit-api
+```
+
+Set `FIREBASE_CREDENTIALS_PATH=/run/secrets/firebase.json`. The image contains
+no `.env`, credentials, tests, uploads, or generated PDFs. Do not enable proxy
+header trust globally. Configure trusted forwarded headers only when the chosen
+platform documents the proxy addresses.
+
+### Health, readiness, limits, and logs
+
+- `GET /health` checks only that the process is alive.
+- `GET /ready` performs a bounded MongoDB ping and returns `503` when critical
+  persistence is unavailable. It does not call Mistral or write to S3.
+- Every response includes `X-Request-ID`; JSON logs contain method, route
+  template, status, and duration without request bodies or credentials.
+- Uploads default to 5 MB, JSON bodies to 1 MB, and job descriptions to 30,000
+  characters. List endpoints default to 20 and cap at 100.
+- AI, upload, and PDF generation routes have separate per-Firebase-UID limits.
+  The included limiter is process-local. Multi-instance production deployments
+  must also enforce shared rate limits at an API gateway or replace it with a
+  shared Redis-backed limiter.
+- The application body guard relies on `Content-Length`; configure the same or
+  stricter body-size limit at the trusted ingress to cover chunked requests.
+
+### External services
+
+- MongoDB uses one pooled client with server-selection, connect, and socket
+  timeouts plus retryable reads/writes. Use an application database user with
+  only the required database privileges and restrict Atlas network access.
+- Mistral has a 45-second timeout, short bounded transient backoff, and one
+  structured-output correction attempt. Resume/JD contents are never logged.
+- S3 uses bounded standard retries and connect/read timeouts. Enable Block Public
+  Access. The backend IAM principal needs only `s3:PutObject`, `s3:GetObject`,
+  and `s3:DeleteObject` for the ResumeFit bucket/prefix. Never grant `s3:*`.
+  Prefer a deployment-attached IAM role; when static credentials are used for
+  local development, both access-key variables must be supplied together.
+- Only S3 object keys and metadata are persisted. Signed URLs are generated on
+  demand, expire after 900 seconds by default, and are never logged.
+- If direct browser PDF preview needs S3 CORS, allow only the production frontend
+  origin and `GET`/`HEAD`; do not use `*`.
+
+### Firebase and frontend hosting
+
+Enable Email/Password authentication and add the production frontend domain to
+Firebase Authorized Domains. Firebase web configuration is public by design;
+Firebase Admin JSON belongs only in the backend secret manager. `vercel.json`
+and `public/_redirects` provide SPA fallbacks so direct refreshes of dashboard,
+resume, job, and optimization routes resolve to `index.html`.
+
+### Security and privacy notes
+
+The verified Firebase UID is the only ownership identity. Every repository
+lookup for resumes, jobs, optimizations, PDFs, updates, and deletes includes
+`user_id`. The API ignores frontend-supplied identity claims. Responses include
+`nosniff`, frame denial, strict referrer policy, and a restrictive permissions
+policy; production additionally enables HSTS. CORS permits only configured
+frontend origins. React escapes user/model text and generated resume links accept
+only HTTP(S) schemes.
+
+Firebase tokens, Authorization headers, MongoDB URIs, AWS/Mistral secrets,
+service-account data, signed URLs, raw resume text, full JDs, and optimized resume
+content must never be logged. If a secret has ever been committed, deleting it is
+insufficient: rotate it and purge it from repository history.
+
+### Deployment checklist
+
+- Configure production frontend/API URLs and HTTPS.
+- Restrict CORS and Firebase Authorized Domains to the frontend domain.
+- Inject MongoDB, Mistral, AWS, and Firebase Admin secrets through the host's
+  secret manager; set `ENABLE_API_DOCS=false` and `LOG_LEVEL=INFO`.
+- Restrict Atlas networking and use a least-privilege database user.
+- Enable S3 Block Public Access, least-privilege IAM, lifecycle rules if desired,
+  and narrowly scoped preview CORS.
+- Verify `/health`, `/ready`, request IDs, rate limiting, invalid uploads, and
+  friendly dependency-failure responses.
+- Run `pytest -q`, `npm run lint`, `npm run build`, and optionally build the Docker
+  image. CI runs compile/tests/lint/build without live production services.
+- Manually complete login, upload, parse, JD analysis, match, suggestion review,
+  apply, PDF generation/preview/download, refresh persistence, logout/login
+  recovery, expired-link refresh, invalid upload, and private-object checks.
+
+No deployment is performed automatically by this repository. Select a static
+frontend host and a container/Python backend host, inject the documented secrets,
+and configure the provider's health check to `/health` (and readiness gate to
+`/ready` when supported).

@@ -21,6 +21,11 @@ def clear_client_cache() -> None:
     mistral_service.get_mistral_client.cache_clear()
 
 
+def test_skill_suggestion_category_is_corrected() -> None:
+    assert resume_optimizer._normalized_skill_suggestion_type("add_tool_skill", "CSS") == "add_technical_skill"
+    assert resume_optimizer._normalized_skill_suggestion_type("confirm_technical_skill", "Docker") == "confirm_tool_skill"
+
+
 def test_mocked_mistral_generates_valid_safe_suggestion(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = {
         "suggestions": [
@@ -176,9 +181,9 @@ def test_model_can_propose_evidenced_skill_for_individual_approval(
         resume, job, calculate_resume_match(resume, job)
     )
 
-    evidenced = [item for item in suggestions if item.type == "add_technical_skill"]
+    evidenced = [item for item in suggestions if item.type == "add_tool_skill"]
     assert len(evidenced) == 1
-    assert evidenced[0].original == "Not listed in Technical Skills"
+    assert evidenced[0].original == "Not listed in Tools"
 
 
 def test_missing_job_skill_becomes_explicit_confirmation_card(
@@ -202,6 +207,6 @@ def test_missing_job_skill_becomes_explicit_confirmation_card(
     )
 
     docker = next(item for item in suggestions if item.suggested == "Docker")
-    assert docker.type == "confirm_technical_skill"
+    assert docker.type == "confirm_tool_skill"
     assert docker.status == "pending"
     assert "confirmation required" in docker.original

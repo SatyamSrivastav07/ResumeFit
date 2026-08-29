@@ -2,6 +2,37 @@ function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+function safeHref(value) {
+  if (!hasText(value)) return null
+  try {
+    const parsed = new URL(value)
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : null
+  } catch {
+    return null
+  }
+}
+
+function ResumeLink({ children, value }) {
+  const href = safeHref(value)
+  if (!href) return <span className="break-words">{value}</span>
+  return <a className="break-words font-semibold text-brand-700 underline" href={href} rel="noreferrer" target="_blank">{children}</a>
+}
+
+function projectLinks(project) {
+  const candidates = [
+    ['GitHub', project.github_link],
+    ['Live Demo', project.live_link],
+    [safeHref(project.link)?.includes('github.com') ? 'GitHub' : 'Live Demo', project.link],
+  ]
+  const seen = new Set()
+  return candidates.filter(([, value]) => {
+    const href = safeHref(value)
+    if (!href || seen.has(href)) return false
+    seen.add(href)
+    return true
+  })
+}
+
 function Section({ title, children }) {
   return (
     <section className="border-t border-slate-200 pt-6 first:border-0 first:pt-0">
@@ -58,7 +89,7 @@ function ParsedResume({ resume }) {
               {contacts.map(([label, value]) => (
                 <div key={label} className="rounded-xl bg-slate-50 px-4 py-3">
                   <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
-                  <dd className="mt-1 break-words text-sm text-slate-800">{value}</dd>
+                  <dd className="mt-1 break-words text-sm text-slate-800">{['LinkedIn', 'GitHub', 'Portfolio'].includes(label) ? <ResumeLink value={value}>{label}</ResumeLink> : value}</dd>
                 </div>
               ))}
             </dl>
@@ -101,14 +132,15 @@ function ParsedResume({ resume }) {
         {resume.projects?.length > 0 && (
           <Section title="Projects">
             <div className="space-y-6">
-              {resume.projects.map((item, index) => (
-                <article key={`${item.name}-${index}`}>
+              {resume.projects.map((item, index) => {
+                const links = projectLinks(item)
+                return <article key={`${item.name}-${index}`}>
                   <h4 className="font-bold text-ink">{item.name}</h4>
-                  {hasText(item.link) && <p className="mt-1 break-words text-xs text-slate-500">{item.link}</p>}
+                  {links.length > 0 && <div className="mt-1 flex flex-wrap gap-3 text-xs">{links.map(([label, value]) => <ResumeLink key={`${label}-${value}`} value={value}>{label}</ResumeLink>)}</div>}
                   <Bullets items={item.description} />
                   {item.technologies?.length > 0 && <p className="mt-3 text-xs font-semibold text-brand-800">{item.technologies.join(' · ')}</p>}
                 </article>
-              ))}
+              })}
             </div>
           </Section>
         )}

@@ -3,6 +3,7 @@ import logging
 from functools import lru_cache
 
 from mistralai.client import Mistral
+from mistralai.client.utils.retries import BackoffStrategy, RetryConfig
 from pydantic import ValidationError
 
 from app.config import settings
@@ -31,7 +32,20 @@ class MistralResponseError(MistralServiceError):
 def get_mistral_client() -> Mistral:
     if not settings.mistral_api_key:
         raise MistralConfigurationError("MISTRAL_API_KEY is not configured.")
-    return Mistral(api_key=settings.mistral_api_key)
+    return Mistral(
+        api_key=settings.mistral_api_key,
+        timeout_ms=settings.mistral_timeout_seconds * 1_000,
+        retry_config=RetryConfig(
+            strategy="backoff",
+            backoff=BackoffStrategy(
+                initial_interval=250,
+                max_interval=1_000,
+                exponent=2,
+                max_elapsed_time=3_000,
+            ),
+            retry_connection_errors=True,
+        ),
+    )
 
 
 def _message_content(response: object) -> str:

@@ -18,7 +18,7 @@ async def analyze_match(
     request: MatchRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> MatchResponse:
-    logger.info("Resume match requested for authenticated user %s.", current_user.uid)
+    logger.info("Legacy deterministic resume match requested.")
     try:
         analysis = await run_in_threadpool(
             calculate_resume_match,
@@ -32,7 +32,7 @@ async def analyze_match(
             detail="Unable to calculate the resume match right now.",
         ) from exc
 
-    logger.info("Resume match completed for authenticated user %s.", current_user.uid)
+    logger.info("Legacy deterministic resume match completed.")
     return MatchResponse(
         resume_id=request.resume_id,
         job_id=request.job_id,

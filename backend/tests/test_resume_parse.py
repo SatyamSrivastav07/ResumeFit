@@ -33,7 +33,7 @@ def test_parse_requires_authentication() -> None:
 def test_invalid_resume_id_returns_400(authenticated_user: None) -> None:
     response = client.post("/api/resumes/not-a-uuid/parse")
     assert response.status_code == 400
-    assert response.json() == {"detail": "Invalid resume ID."}
+    assert response.json()["detail"] == "Invalid resume ID."
 
 
 def test_missing_s3_resume_returns_404(
@@ -46,7 +46,7 @@ def test_missing_s3_resume_returns_404(
     monkeypatch.setattr(resumes_route, "download_file", missing)
     response = client.post(f"/api/resumes/{uuid4()}/parse")
     assert response.status_code == 404
-    assert response.json() == {"detail": "Resume was not found."}
+    assert response.json()["detail"] == "Resume was not found."
 
 
 def test_valid_resume_returns_structured_data(
@@ -130,9 +130,8 @@ def test_mistral_failure_returns_safe_502(
     monkeypatch.setattr(resumes_route, "parse_resume_text", fail_mistral)
     response = client.post(f"/api/resumes/{uuid4()}/parse")
     assert response.status_code == 502
-    assert response.json() == {
-        "detail": "Unable to parse this resume right now. Please try again."
-    }
+    assert response.json()["detail"] == "Unable to parse this resume right now. Please try again."
+    assert response.json()["error"]["code"] == "UPSTREAM_ERROR"
     assert "secret provider details" not in response.text
 
 

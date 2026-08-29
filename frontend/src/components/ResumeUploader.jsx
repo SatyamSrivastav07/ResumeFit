@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 
 import { parseResume, uploadResume } from '../services/resumeService.js'
+import { getApiErrorMessage } from '../services/api.js'
+import ErrorBanner from './ErrorBanner.jsx'
 import JobDescriptionForm from './JobDescriptionForm.jsx'
 import ParsedResume from './ParsedResume.jsx'
 
@@ -97,7 +99,7 @@ function ResumeUploader() {
       } else if (status === 400 && typeof detail === 'string') {
         setError(detail)
       } else {
-        setError('Unable to upload your resume right now. Please try again.')
+        setError(getApiErrorMessage(requestError, 'Unable to upload your resume right now. Please try again.'))
       }
     } finally {
       setUploading(false)
@@ -123,7 +125,7 @@ function ResumeUploader() {
       } else if (status === 503) {
         setParseError('Resume parsing is not configured or temporarily unavailable.')
       } else {
-        setParseError('Unable to analyze this resume right now. Please try again.')
+        setParseError(getApiErrorMessage(requestError, 'Unable to analyze this resume right now. Please try again.'))
       }
     } finally {
       setParsing(false)
@@ -197,9 +199,7 @@ function ResumeUploader() {
       )}
 
       {error && (
-        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          <span className="font-bold">Upload failed. </span>{error}
-        </div>
+        <div className="mt-5"><ErrorBanner message={`Upload failed. ${error}`} /></div>
       )}
 
       {result && (
@@ -217,9 +217,7 @@ function ResumeUploader() {
       )}
 
       {parseError && (
-        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          <span className="font-bold">Analysis failed. </span>{parseError}
-        </div>
+        <div className="mt-5"><ErrorBanner message={`Analysis failed. ${parseError}`} /></div>
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-4">

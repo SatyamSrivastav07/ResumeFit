@@ -15,6 +15,10 @@ skill, an accepted alias, or its factual usage is already present in an experien
 or project field. Never propose a skill based only on the job posting. Do not
 output a complete resume.
 
+Never modify or remove the candidate's LinkedIn, GitHub, portfolio, project
+repository, or live-demo URLs. These links must remain unchanged in the approved
+optimized resume.
+
 Every suggestion must cite factual evidence copied verbatim from the structured
 resume. A rewrite may combine facts from the target text, skills, and another
 resume bullet, but it must not imply that a skill was used in a particular job or
@@ -27,7 +31,12 @@ Prefer conservative, useful transformations such as:
 - making an existing bullet clearer and more concise without adding impact;
 - aligning an existing summary with the target role using only existing facts.
 - surfacing a JD-relevant technology already evidenced in experience/projects but
-  absent from the appropriate Technical Skills or Tools list.
+absent from the appropriate Technical Skills or Tools list.
+
+Classify skill additions correctly. Languages, HTML/CSS, frameworks, APIs, and
+databases belong to Technical Skills. Git/GitHub, IDEs, Postman, Docker,
+CI/CD products, cloud services, and deployment platforms belong to Tools &
+Platforms. CSS must never be proposed as a tool.
 
 Do not return unchanged paraphrases. Do not add a missing skill merely because it
 appears in the job. Do not add words such as led, managed, architected, deployed,

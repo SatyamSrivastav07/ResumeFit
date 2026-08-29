@@ -2,11 +2,13 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from starlette.concurrency import run_in_threadpool
 
 from app.dependencies.persistence import get_persisted_user, require_database
+from app.config import settings
+from app.core.rate_limit import ai_rate_limit, upload_rate_limit
 from app.repositories.jobs import delete_jobs_for_resume
 from app.repositories.optimizations import delete_for_resume, list_for_resume
 from app.repositories.resumes import create_resume, delete_resume_record, get_resume_by_id, list_user_resumes, mark_parse_failed, public_resume, update_parsed_resume
@@ -18,9 +20,9 @@ from app.services.s3_service import S3ConfigurationError, S3ObjectNotFoundError,
 
 router = APIRouter(prefix="/api/resumes", tags=["Resumes"])
 logger = logging.getLogger(__name__)
-MAX_PDF_SIZE = 5 * 1024 * 1024
+MAX_PDF_SIZE = settings.max_upload_size_bytes
 PDF_CONTENT_TYPE = "application/pdf"
-PDF_URL_EXPIRES_IN = 15 * 60
+PDF_URL_EXPIRES_IN = settings.presigned_url_expiry_seconds
 
 
 def _safe_display_filename(filename: str | None) -> str:
@@ -46,12 +48,15 @@ def _database_unavailable(exc: Exception) -> HTTPException:
     return HTTPException(status_code=503, detail="Database is temporarily unavailable. Please try again.")
 
 
-@router.post("/upload", response_model=ResumeUploadResponse)
+@router.post("/upload", response_model=ResumeUploadResponse, dependencies=[Depends(upload_rate_limit)])
 async def upload_resume(
     current_user: Annotated[CurrentUser, Depends(get_persisted_user)],
     database: Annotated[Any, Depends(require_database)],
     file: Annotated[UploadFile, File(description="PDF resume, maximum 5 MB")],
 ) -> ResumeUploadResponse:
+    if file.filename and len(file.filename.encode("utf-8")) > 255:
+        await file.close()
+        raise HTTPException(status_code=400, detail="The uploaded filename is too long.")
     filename = _safe_display_filename(file.filename)
     if not filename.lower().endswith(".pdf") or file.content_type != PDF_CONTENT_TYPE:
         raise HTTPException(status_code=400, detail="Only PDF resume files are accepted.")
@@ -95,9 +100,13 @@ async def upload_resume(
 
 
 @router.get("", response_model=ResumeListResponse)
-async def list_resumes(current_user: Annotated[CurrentUser, Depends(get_persisted_user)], database: Annotated[Any, Depends(require_database)]) -> ResumeListResponse:
+async def list_resumes(
+    current_user: Annotated[CurrentUser, Depends(get_persisted_user)],
+    database: Annotated[Any, Depends(require_database)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ResumeListResponse:
     try:
-        documents = await list_user_resumes(database, current_user.uid)
+        documents = await list_user_resumes(database, current_user.uid, limit=limit)
     except PyMongoError as exc:
         raise _database_unavailable(exc) from exc
     return ResumeListResponse(items=[{
@@ -161,7 +170,7 @@ async def refresh_resume_pdf_access(
     )
 
 
-@router.post("/{resume_id}/parse", response_model=ResumeParseResponse)
+@router.post("/{resume_id}/parse", response_model=ResumeParseResponse, dependencies=[Depends(ai_rate_limit)])
 async def parse_resume(resume_id: str, current_user: Annotated[CurrentUser, Depends(get_persisted_user)], database: Annotated[Any, Depends(require_database)]) -> ResumeParseResponse:
     canonical_id = _canonical_resume_id(resume_id)
     try:

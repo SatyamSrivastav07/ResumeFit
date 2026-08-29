@@ -31,7 +31,7 @@ async def list_user_jobs(database: Any, user_id: str, *, resume_id: str | None =
     query: dict[str, Any] = {"user_id": user_id}
     if resume_id:
         query["resume_id"] = resume_id
-    cursor = database.jobs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
+    cursor = database.jobs.find(query, {"_id": 0}).sort([("created_at", -1), ("job_id", -1)]).limit(limit)
     return [document async for document in cursor]
 
 
@@ -57,7 +57,7 @@ async def dashboard_history(database: Any, user_id: str, *, limit: int = 20) -> 
     resumes = {item["resume_id"]: item async for item in resume_cursor}
     optimization_cursor = database.optimizations.find(
         {"user_id": user_id, "job_id": {"$in": job_ids}},
-    ).sort("created_at", -1)
+    ).sort([("created_at", -1), ("optimization_id", -1)])
     latest_optimizations: dict[str, dict[str, Any]] = {}
     async for item in optimization_cursor:
         latest_optimizations.setdefault(item["job_id"], item)

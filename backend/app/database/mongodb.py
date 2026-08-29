@@ -24,7 +24,13 @@ def get_database() -> Any:
         _client = AsyncMongoClient(
             settings.mongodb_uri,
             tz_aware=True,
-            serverSelectionTimeoutMS=5_000,
+            serverSelectionTimeoutMS=settings.mongodb_server_selection_timeout_ms,
+            connectTimeoutMS=settings.mongodb_connect_timeout_ms,
+            socketTimeoutMS=settings.mongodb_socket_timeout_ms,
+            retryReads=True,
+            retryWrites=True,
+            maxPoolSize=50,
+            appname="resumefit-api",
         )
     return _client[settings.mongodb_database]
 
@@ -44,11 +50,13 @@ async def initialize_mongodb() -> None:
         await database.jobs.create_index("user_id")
         await database.jobs.create_index("resume_id")
         await database.jobs.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
+        await database.jobs.create_index([("user_id", ASCENDING), ("resume_id", ASCENDING), ("created_at", DESCENDING)])
         await database.optimizations.create_index("optimization_id", unique=True)
         await database.optimizations.create_index("user_id")
         await database.optimizations.create_index("job_id")
         await database.optimizations.create_index("resume_id")
         await database.optimizations.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
+        await database.optimizations.create_index([("user_id", ASCENDING), ("job_id", ASCENDING), ("created_at", DESCENDING)])
     except PyMongoError:
         logger.exception("MongoDB initialization failed.")
         raise

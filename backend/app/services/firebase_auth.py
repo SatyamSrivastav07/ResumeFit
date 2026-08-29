@@ -84,7 +84,14 @@ async def get_current_user(authorization: str | None = Header(default=None)) -> 
         ) from exc
 
     try:
-        decoded_token = auth.verify_id_token(token, app=firebase_app)
+        # Revocation checks matter after password resets, account deletion, and
+        # explicit administrator session revocation. Firebase disables this
+        # network-backed check by default, so opt in for protected API access.
+        decoded_token = auth.verify_id_token(
+            token,
+            app=firebase_app,
+            check_revoked=True,
+        )
     except (
         auth.ExpiredIdTokenError,
         auth.InvalidIdTokenError,

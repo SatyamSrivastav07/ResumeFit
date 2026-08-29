@@ -17,6 +17,16 @@ backend/.ruff_cache/
 backend/secrets/
 backend/firebase-service-account.json
 *.py[cod]
+*.pem
+*.key
+*service-account*.json
+firebase-admin*.json
+aws-credentials*
+
+# Generated/private artifacts
+output/
+tmp/
+*.pdf
 
 # Editors and operating systems
 .idea/

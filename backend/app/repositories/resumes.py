@@ -32,7 +32,7 @@ async def list_user_resumes(database: Any, user_id: str, *, limit: int = 100) ->
     cursor = database.resumes.find(
         {"user_id": user_id},
         {"_id": 0, "parsed_resume": 0, "original_s3_key": 0},
-    ).sort("created_at", -1).limit(limit)
+    ).sort([("created_at", -1), ("resume_id", -1)]).limit(limit)
     return [document async for document in cursor]
 
 

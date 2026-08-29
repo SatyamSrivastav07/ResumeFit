@@ -90,6 +90,27 @@ def test_authenticated_non_pdf_is_rejected(
     assert upload_called is False
 
 
+def test_authenticated_excessive_filename_is_rejected(
+    authenticated_user: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    upload_called = False
+
+    def fake_upload_file(**_: object) -> None:
+        nonlocal upload_called
+        upload_called = True
+
+    monkeypatch.setattr(resumes_route, "upload_file", fake_upload_file)
+    response = client.post(
+        "/api/resumes/upload",
+        files={"file": (f"{'r' * 252}.pdf", b"%PDF-1.4\ntest", "application/pdf")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "The uploaded filename is too long."
+    assert upload_called is False
+
+
 def test_authenticated_pdf_with_invalid_header_is_rejected(
     authenticated_user: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -107,7 +128,8 @@ def test_authenticated_pdf_with_invalid_header_is_rejected(
     )
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "The uploaded file is not a valid PDF."}
+    assert response.json()["detail"] == "The uploaded file is not a valid PDF."
+    assert response.json()["error"]["code"] == "BAD_REQUEST"
     assert upload_called is False
 
 

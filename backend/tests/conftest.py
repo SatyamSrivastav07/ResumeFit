@@ -3,13 +3,16 @@ from mongomock_motor import AsyncMongoMockClient
 
 from app.dependencies.persistence import require_database
 from app.main import app
+from app.core.rate_limit import limiter
 
 
 @pytest.fixture(autouse=True)
 def isolated_database():
+    limiter.clear()
     client = AsyncMongoMockClient()
     database = client["resumefit_test"]
     app.dependency_overrides[require_database] = lambda: database
     yield database
     app.dependency_overrides.pop(require_database, None)
+    limiter.clear()
     client.close()

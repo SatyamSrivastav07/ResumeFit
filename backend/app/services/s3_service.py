@@ -3,6 +3,7 @@ from typing import Any
 
 import boto3
 from botocore.client import BaseClient
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.config import settings
@@ -23,8 +24,6 @@ class S3ObjectNotFoundError(S3OperationError):
 @lru_cache(maxsize=1)
 def get_s3_client() -> BaseClient:
     required_values = {
-        "AWS_ACCESS_KEY_ID": settings.aws_access_key_id,
-        "AWS_SECRET_ACCESS_KEY": settings.aws_secret_access_key,
         "AWS_REGION": settings.aws_region,
         "AWS_S3_BUCKET": settings.aws_s3_bucket,
     }
@@ -34,11 +33,23 @@ def get_s3_client() -> BaseClient:
             f"Missing required S3 configuration: {', '.join(missing)}"
         )
 
+    credential_options = {}
+    if settings.aws_access_key_id and settings.aws_secret_access_key:
+        credential_options = {
+            "aws_access_key_id": settings.aws_access_key_id,
+            "aws_secret_access_key": settings.aws_secret_access_key,
+        }
+
     return boto3.client(
         "s3",
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
+        **credential_options,
         region_name=settings.aws_region,
+        config=Config(
+            connect_timeout=settings.aws_connect_timeout_seconds,
+            read_timeout=settings.aws_read_timeout_seconds,
+            retries={"max_attempts": 3, "mode": "standard"},
+            signature_version="s3v4",
+        ),
     )
 
 

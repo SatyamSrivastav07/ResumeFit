@@ -44,10 +44,10 @@ class OptimizationSuggestion(OptimizationModel):
     bullet_index: int | None = Field(default=None, ge=0)
     type: SuggestionType
     original: str = Field(min_length=1)
-    suggested: str = Field(min_length=1)
+    suggested: str = Field(min_length=1, max_length=2_000)
     reason: str = Field(min_length=1, max_length=500)
     matched_job_keywords: list[str] = Field(default_factory=list)
-    evidence: list[str] = Field(min_length=1)
+    evidence: list[str] = Field(min_length=1, max_length=20)
     status: SuggestionStatus = "pending"
 
     @field_validator("id", mode="before")
@@ -115,7 +115,7 @@ class PersistentOptimizationRequest(OptimizationModel):
 class SuggestionDecision(OptimizationModel):
     id: str
     status: Literal["accepted", "rejected", "edited"]
-    edited_text: str | None = Field(default=None, min_length=1)
+    edited_text: str | None = Field(default=None, min_length=1, max_length=2_000)
 
     @field_validator("id", mode="before")
     @classmethod
@@ -132,7 +132,7 @@ class SuggestionDecision(OptimizationModel):
 
 
 class ApplyPersistentOptimizationRequest(OptimizationModel):
-    suggestions: list[SuggestionDecision]
+    suggestions: list[SuggestionDecision] = Field(max_length=100)
 
 
 class GeneratedPDFMetadata(OptimizationModel):

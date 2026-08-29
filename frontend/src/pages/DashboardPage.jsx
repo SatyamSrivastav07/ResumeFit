@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import DashboardHeader from '../components/DashboardHeader.jsx'
+import ErrorBanner from '../components/ErrorBanner.jsx'
 import ResumeUploader from '../components/ResumeUploader.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getDashboardHistory } from '../services/dashboardService.js'
+import { getApiErrorMessage } from '../services/api.js'
 import { listResumes } from '../services/resumeService.js'
 import { statusLabel } from '../utils/statusLabels.js'
 
@@ -17,7 +19,7 @@ function DashboardPage() {
   useEffect(() => {
     Promise.all([getDashboardHistory(), listResumes()])
       .then(([historyData, resumeData]) => { setHistory(historyData.items); setResumes(resumeData.items) })
-      .catch(() => setError('Unable to load your saved resumes and activity.'))
+      .catch((requestError) => setError(getApiErrorMessage(requestError, 'Unable to load your saved resumes and activity.')))
       .finally(() => setLoading(false))
   }, [])
   return (
@@ -41,7 +43,7 @@ function DashboardPage() {
         <section className="mt-10" aria-labelledby="history-title">
           <div className="flex items-center justify-between"><h2 id="history-title" className="text-2xl font-black text-ink">Recent Applications</h2><Link className="text-sm font-bold text-brand-700" to="/resumes">View all resumes</Link></div>
           {loading && <p className="mt-5 text-slate-500">Loading history...</p>}
-          {error && <p className="mt-5 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
+          {error && <div className="mt-5"><ErrorBanner message={error} /></div>}
           {!loading && !error && history.length === 0 && <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center"><p className="font-bold text-ink">No tailored resumes yet.</p><a className="mt-3 inline-block text-sm font-bold text-brand-700" href="#tailor-new">Tailor Your First Resume</a></div>}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             {history.map((item) => <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card" key={item.job_id}>

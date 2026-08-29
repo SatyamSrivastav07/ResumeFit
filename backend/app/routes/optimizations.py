@@ -7,8 +7,10 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from starlette.concurrency import run_in_threadpool
 
 from app.dependencies.persistence import get_persisted_user, require_database
+from app.config import settings
+from app.core.rate_limit import ai_rate_limit, pdf_rate_limit
 from app.repositories.jobs import get_job_by_id, update_job_status
-from app.repositories.optimizations import create_optimization, delete_optimization_record, get_optimization_by_id, public_optimization, update_applied_optimization, update_generated_pdf
+from app.repositories.optimizations import create_optimization, delete_optimization_record, get_active_for_job, get_optimization_by_id, public_optimization, update_applied_optimization, update_generated_pdf
 from app.repositories.resumes import get_resume_by_id
 from app.repositories.users import utc_now
 from app.schemas.auth import CurrentUser
@@ -26,7 +28,7 @@ from app.utils.filenames import build_resume_filename
 
 router = APIRouter(prefix="/api/optimizations", tags=["Optimizations"])
 logger = logging.getLogger(__name__)
-PDF_URL_EXPIRES_IN = 900
+PDF_URL_EXPIRES_IN = settings.presigned_url_expiry_seconds
 
 
 def _validated_id(value: str) -> str:
@@ -50,9 +52,16 @@ def _create_pdf_access_urls(key: str, filename: str) -> tuple[str, str]:
     return preview_url, download_url
 
 
-@router.post("/generate", response_model=OptimizationResponse)
+@router.post("/generate", response_model=OptimizationResponse, dependencies=[Depends(ai_rate_limit)])
 async def generate_optimizations(request: PersistentOptimizationRequest, current_user: Annotated[CurrentUser, Depends(get_persisted_user)], database: Annotated[Any, Depends(require_database)]) -> OptimizationResponse:
     try:
+        active = await get_active_for_job(database, current_user.uid, request.job_id)
+        if active:
+            return OptimizationResponse(
+                optimization_id=active["optimization_id"], resume_id=active["resume_id"],
+                job_id=active["job_id"], status="suggestions_generated",
+                suggestions=[OptimizationSuggestion.model_validate(item) for item in active["suggestions"]],
+            )
         job = await get_job_by_id(database, current_user.uid, request.job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job was not found.")
@@ -154,7 +163,7 @@ async def apply_optimizations(optimization_id: str, request: ApplyPersistentOpti
     return ApplyOptimizationResponse(optimization_id=canonical_id, status="applied", optimized_resume=applied.optimized_resume, score_comparison=ScoreComparison(before=before, after=after, change=after-before), match=applied.after_match)
 
 
-@router.post("/{optimization_id}/generate-pdf", response_model=PDFGenerationResponse)
+@router.post("/{optimization_id}/generate-pdf", response_model=PDFGenerationResponse, dependencies=[Depends(pdf_rate_limit)])
 async def generate_optimized_pdf(optimization_id: str, current_user: Annotated[CurrentUser, Depends(get_persisted_user)], database: Annotated[Any, Depends(require_database)]) -> PDFGenerationResponse:
     canonical_id = _validated_id(optimization_id)
     try:

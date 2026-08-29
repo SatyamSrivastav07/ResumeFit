@@ -7,11 +7,12 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 from starlette.concurrency import run_in_threadpool
 
 from app.dependencies.persistence import get_persisted_user, require_database
+from app.core.rate_limit import ai_rate_limit
 from app.repositories.jobs import create_job, delete_job_record, get_job_by_id, list_user_jobs, update_match
 from app.repositories.optimizations import delete_for_job, list_for_job
 from app.repositories.resumes import get_resume_by_id
 from app.schemas.auth import CurrentUser
-from app.schemas.job import JobAnalysisRequest, JobAnalysisResponse, JobDetailResponse, JobListResponse
+from app.schemas.job import JobAnalysisRequest, JobAnalysisResponse, JobDetailResponse, JobListItem, JobListResponse
 from app.schemas.match import MatchResponse
 from app.schemas.resume import ResumeSchema
 from app.schemas.job import JobAnalysisSchema
@@ -38,7 +39,7 @@ def _database_unavailable(exc: Exception) -> HTTPException:
     return HTTPException(status_code=503, detail="Database is temporarily unavailable. Please try again.")
 
 
-@router.post("/analyze", response_model=JobAnalysisResponse)
+@router.post("/analyze", response_model=JobAnalysisResponse, dependencies=[Depends(ai_rate_limit)])
 async def analyze_job(request: JobAnalysisRequest, current_user: Annotated[CurrentUser, Depends(get_persisted_user)], database: Annotated[Any, Depends(require_database)]) -> JobAnalysisResponse:
     try:
         resume = await get_resume_by_id(database, current_user.uid, request.resume_id)
@@ -65,13 +66,18 @@ async def analyze_job(request: JobAnalysisRequest, current_user: Annotated[Curre
 
 
 @router.get("", response_model=JobListResponse)
-async def list_jobs(current_user: Annotated[CurrentUser, Depends(get_persisted_user)], database: Annotated[Any, Depends(require_database)], resume_id: Annotated[str | None, Query()] = None) -> JobListResponse:
+async def list_jobs(
+    current_user: Annotated[CurrentUser, Depends(get_persisted_user)],
+    database: Annotated[Any, Depends(require_database)],
+    resume_id: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> JobListResponse:
     canonical_resume_id = _canonical_id(resume_id, "resume") if resume_id else None
     try:
-        documents = await list_user_jobs(database, current_user.uid, resume_id=canonical_resume_id)
+        documents = await list_user_jobs(database, current_user.uid, resume_id=canonical_resume_id, limit=limit)
     except PyMongoError as exc:
         raise _database_unavailable(exc) from exc
-    return JobListResponse(items=documents)
+    return JobListResponse(items=[JobListItem.model_validate(item) for item in documents])
 
 
 @router.get("/{job_id}", response_model=JobDetailResponse)

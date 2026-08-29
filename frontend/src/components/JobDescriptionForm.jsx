@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { analyzeJob, analyzeMatch } from '../services/jobService.js'
 import { applyOptimizations, generateOptimizations } from '../services/optimizationService.js'
+import ErrorBanner from './ErrorBanner.jsx'
 import JobAnalysis from './JobAnalysis.jsx'
 import MatchAnalysis from './MatchAnalysis.jsx'
 import OptimizationSuggestions from './OptimizationSuggestions.jsx'
@@ -237,7 +238,7 @@ function JobDescriptionForm({ resumeId }) {
             </span>
           </label>
 
-          {requestError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{requestError}</div>}
+          {requestError && <ErrorBanner message={requestError} />}
 
           <button
             className="rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-600/20 hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -254,7 +255,7 @@ function JobDescriptionForm({ resumeId }) {
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card sm:p-8">
           <h2 className="text-xl font-black text-ink">Ready to compare</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Calculate a deterministic match from the parsed resume and structured job requirements.</p>
-          {matchError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{matchError}</div>}
+          {matchError && <div className="mt-4"><ErrorBanner message={matchError} /></div>}
           <button
             className="mt-5 rounded-xl bg-ink px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={matching}
@@ -270,7 +271,7 @@ function JobDescriptionForm({ resumeId }) {
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card sm:p-8">
           <h2 className="text-xl font-black text-ink">Improve relevant wording safely</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Generate targeted rewrites grounded only in information already present in your resume.</p>
-          {optimizationError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{optimizationError}</div>}
+          {optimizationError && <div className="mt-4"><ErrorBanner message={optimizationError} /></div>}
           <button
             className="mt-5 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-600/20 hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={generating}

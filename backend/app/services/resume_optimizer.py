@@ -9,7 +9,7 @@ from app.prompts.resume_optimizer import SYSTEM_PROMPT, build_optimizer_prompt
 from app.schemas.job import JobAnalysisSchema
 from app.schemas.match import MatchAnalysisSchema
 from app.schemas.optimization import OptimizationSuggestion, SuggestionType
-from app.schemas.resume import ResumeSchema
+from app.schemas.resume import ResumeSchema, classify_skill_category
 from app.services.mistral_service import (
     MistralResponseError,
     MistralServiceError,
@@ -31,6 +31,20 @@ MIN_USEFUL_SUGGESTIONS = 3
 CONFIRMATION_EVIDENCE = (
     "Candidate confirmation required because this skill was not found in the uploaded resume."
 )
+
+
+def _normalized_skill_suggestion_type(
+    suggestion_type: SuggestionType,
+    skill: str,
+) -> SuggestionType:
+    category = classify_skill_category(skill)
+    if category is None or suggestion_type not in {
+        "add_technical_skill", "add_tool_skill",
+        "confirm_technical_skill", "confirm_tool_skill",
+    }:
+        return suggestion_type
+    prefix = "confirm" if suggestion_type.startswith("confirm_") else "add"
+    return f"{prefix}_{'tool' if category == 'tools' else 'technical'}_skill"
 
 
 class DraftModel(BaseModel):
@@ -91,6 +105,7 @@ def _with_skill_deficit_confirmations(
         suggestion_type: SuggestionType = (
             "confirm_tool_skill" if normalized in tool_terms else "confirm_technical_skill"
         )
+        suggestion_type = _normalized_skill_suggestion_type(suggestion_type, skill)
         placeholder = OptimizationSuggestion(
             id=str(uuid4()),
             section="skills",
@@ -186,12 +201,16 @@ def generate_resume_suggestions(
         for draft in draft_response.suggestions[:MAX_OPTIMIZATION_SUGGESTIONS]:
             suggestion_id = str(uuid4())
             try:
+                suggestion_type = _normalized_skill_suggestion_type(
+                    draft.type,
+                    draft.suggested,
+                )
                 placeholder = OptimizationSuggestion(
                     id=suggestion_id,
                     section=draft.section,
                     item_index=draft.item_index,
                     bullet_index=draft.bullet_index,
-                    type=draft.type,
+                    type=suggestion_type,
                     original=draft.original or "placeholder",
                     suggested=draft.suggested,
                     reason=draft.reason,
