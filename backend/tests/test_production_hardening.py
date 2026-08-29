@@ -1,3 +1,5 @@
+import base64
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -40,6 +42,24 @@ def test_production_configuration_fails_when_critical_secrets_are_missing() -> N
 def test_development_configuration_allows_localhost_without_live_services() -> None:
     configured = Settings(_env_file=None, app_env="development", frontend_url="http://localhost:5173")
     assert configured.allowed_origins == ["http://localhost:5173"]
+
+
+def test_production_configuration_accepts_base64_firebase_credentials() -> None:
+    service_account = {"type": "service_account", "project_id": "resume-fit-test"}
+    encoded = base64.b64encode(json.dumps(service_account).encode()).decode()
+
+    configured = Settings(
+        _env_file=None,
+        app_env="production",
+        frontend_url="https://resume.example.com",
+        mongodb_uri="mongodb://database.example.com",
+        mistral_api_key="test-key",
+        aws_region="ap-south-1",
+        aws_s3_bucket="resume-test",
+        firebase_credentials_base64=encoded,
+    )
+
+    assert configured.firebase_credentials_from_base64() == service_account
 
 
 def test_aws_static_credentials_must_be_configured_as_a_pair() -> None:

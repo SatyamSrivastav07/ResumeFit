@@ -1,3 +1,5 @@
+import base64
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -35,6 +37,7 @@ class Settings(BaseSettings):
     aws_read_timeout_seconds: int = Field(default=20, ge=1, le=60)
     firebase_project_id: str | None = None
     firebase_credentials_path: str | None = None
+    firebase_credentials_base64: str | None = None
 
     max_upload_size_mb: int = Field(default=5, ge=1, le=20)
     max_json_body_bytes: int = Field(default=1_000_000, ge=100_000, le=5_000_000)
@@ -66,15 +69,35 @@ class Settings(BaseSettings):
                 "MISTRAL_API_KEY": self.mistral_api_key,
                 "AWS_REGION": self.aws_region,
                 "AWS_S3_BUCKET": self.aws_s3_bucket,
-                "FIREBASE_CREDENTIALS_PATH": self.firebase_credentials_path,
+                "FIREBASE_ADMIN_CREDENTIALS": (
+                    self.firebase_credentials_path or self.firebase_credentials_base64
+                ),
             }.items() if not value]
             if missing:
                 raise ValueError(f"Missing production configuration: {', '.join(missing)}")
             if any(urlparse(origin).scheme != "https" for origin in origins):
                 raise ValueError("Production FRONTEND_URL origins must use HTTPS.")
-            if not Path(str(self.firebase_credentials_path)).expanduser().is_file():
+            if (
+                self.firebase_credentials_path
+                and not self.firebase_credentials_base64
+                and not Path(str(self.firebase_credentials_path)).expanduser().is_file()
+            ):
                 raise ValueError("FIREBASE_CREDENTIALS_PATH does not reference a file.")
+            if self.firebase_credentials_base64:
+                self.firebase_credentials_from_base64()
         return self
+
+    def firebase_credentials_from_base64(self) -> dict[str, object]:
+        """Decode Firebase Admin JSON supplied through a secret environment value."""
+
+        try:
+            raw = base64.b64decode(self.firebase_credentials_base64 or "", validate=True)
+            value = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("FIREBASE_CREDENTIALS_BASE64 is not valid Base64-encoded JSON.") from exc
+        if not isinstance(value, dict):
+            raise ValueError("FIREBASE_CREDENTIALS_BASE64 must decode to a JSON object.")
+        return value
 
     @property
     def environment(self) -> str:

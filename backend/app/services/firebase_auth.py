@@ -28,19 +28,24 @@ def get_firebase_app() -> firebase_admin.App:
             return firebase_admin.get_app()
         except ValueError:
             credentials_path = settings.firebase_credentials_path
-            if not credentials_path:
+            credentials_base64 = settings.firebase_credentials_base64
+            if not credentials_path and not credentials_base64:
                 raise FirebaseConfigurationError(
                     "Firebase Admin credentials are not configured."
                 )
 
-            resolved_path = Path(credentials_path).expanduser().resolve()
-            if not resolved_path.is_file():
-                raise FirebaseConfigurationError(
-                    "The configured Firebase Admin credentials file was not found."
-                )
-
             try:
-                certificate = credentials.Certificate(str(resolved_path))
+                if credentials_base64:
+                    certificate = credentials.Certificate(
+                        settings.firebase_credentials_from_base64()
+                    )
+                else:
+                    resolved_path = Path(str(credentials_path)).expanduser().resolve()
+                    if not resolved_path.is_file():
+                        raise FirebaseConfigurationError(
+                            "The configured Firebase Admin credentials file was not found."
+                        )
+                    certificate = credentials.Certificate(str(resolved_path))
                 options = (
                     {"projectId": settings.firebase_project_id}
                     if settings.firebase_project_id
